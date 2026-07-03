@@ -13,11 +13,21 @@ def main() -> None:
     if settings.queue_url is None:
         raise SystemExit("SQS_QUEUE_URL is not set. Run setup_queues first.")
 
+    wait_time_seconds = (
+        settings.wait_time_seconds
+        if args.wait_time_seconds is None
+        else args.wait_time_seconds
+    )
+    max_messages = settings.max_messages if args.max_messages is None else args.max_messages
+
     sqs = create_sqs_client()
+    print(f"Polling for up to {max_messages} message(s).")
+    print(f"Wait time: {wait_time_seconds} second(s).")
+
     response = sqs.receive_message(
         QueueUrl=settings.queue_url,
-        MaxNumberOfMessages=args.max_messages,
-        WaitTimeSeconds=args.wait_time_seconds,
+        MaxNumberOfMessages=max_messages,
+        WaitTimeSeconds=wait_time_seconds,
         MessageAttributeNames=["All"],
         AttributeNames=["ApproximateReceiveCount"],
     )
@@ -44,21 +54,31 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-messages",
         type=int,
-        default=1,
-        help="Maximum number of messages to receive in one request. SQS allows 1-10.",
+        default=None,
+        help=(
+            "Maximum number of messages to receive in one request. "
+            "Defaults to SQS_MAX_MESSAGES from .env."
+        ),
     )
     parser.add_argument(
         "--wait-time-seconds",
         type=int,
-        default=0,
-        help="How long to wait for messages. Part 6 uses 0; Part 7 will use long polling.",
+        default=None,
+        help=(
+            "How long to wait for messages. Defaults to "
+            "SQS_WAIT_TIME_SECONDS from .env."
+        ),
     )
     args = parser.parse_args()
 
-    if args.max_messages < 1 or args.max_messages > 10:
+    if args.max_messages is not None and (
+        args.max_messages < 1 or args.max_messages > 10
+    ):
         parser.error("--max-messages must be between 1 and 10")
 
-    if args.wait_time_seconds < 0 or args.wait_time_seconds > 20:
+    if args.wait_time_seconds is not None and (
+        args.wait_time_seconds < 0 or args.wait_time_seconds > 20
+    ):
         parser.error("--wait-time-seconds must be between 0 and 20")
 
     return args

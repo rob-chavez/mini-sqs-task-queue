@@ -269,13 +269,19 @@ Run the worker:
 PYTHONPATH=src python -m mini_sqs_task_queue.worker
 ```
 
-By default, the worker receives one message. To receive up to three messages in one request:
+By default, the worker receives up to `SQS_MAX_MESSAGES` from `.env`, which is `10` in this tutorial. To receive up to three messages in one request:
 
 ```bash
 PYTHONPATH=src python -m mini_sqs_task_queue.worker --max-messages 3
 ```
 
-In this step, the worker uses short polling with `--wait-time-seconds 0`. With short polling, SQS can return fewer messages than requested, even when more messages are waiting in the queue. If that happens, run the worker again.
+To recreate short polling from this learning step, pass `--wait-time-seconds 0`:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.worker --max-messages 3 --wait-time-seconds 0
+```
+
+With short polling, SQS can return fewer messages than requested, even when more messages are waiting in the queue. If that happens, run the worker again.
 
 Expected output should look similar to this:
 
@@ -307,6 +313,41 @@ SQS queue counts are approximate. After sending, receiving, or deleting messages
 ### Step 7: Add Long Polling
 
 Update the worker to wait for messages efficiently instead of constantly returning empty responses.
+
+Long polling lets SQS hold a receive request open for a short time while it waits for messages. This reduces empty responses and helps workers avoid constantly asking SQS, "anything yet?"
+
+This project configures long polling in two places:
+
+- Queue default: `ReceiveMessageWaitTimeSeconds=20` in `setup_queues.py`
+- Worker default: `SQS_WAIT_TIME_SECONDS=20` in `.env`
+
+Run the worker with its default long-polling behavior:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.worker
+```
+
+Expected output on an empty queue should look similar to this after the wait finishes:
+
+```text
+Polling for up to 10 message(s).
+Wait time: 20 second(s).
+No messages available.
+```
+
+You can override the wait time for a quick test:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.worker --wait-time-seconds 5
+```
+
+To compare long polling with short polling:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.worker --wait-time-seconds 0
+```
+
+Long polling does not guarantee a message exists. It only gives SQS time to wait before returning an empty response.
 
 ### Step 8: Add Simulated Failures
 
