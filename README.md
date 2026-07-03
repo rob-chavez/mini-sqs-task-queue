@@ -61,10 +61,14 @@ Expected output should look similar to this before queues exist:
 ```text
 Mini SQS Task Queue setup check
 AWS region: us-east-1
+Main queue name: mini-sqs-task-queue
+Dead-letter queue name: mini-sqs-task-queue-dlq
 Main queue URL: not set yet
 Dead-letter queue URL: not set yet
 Worker wait time: 20 seconds
 Worker max messages: 10
+Visibility timeout: 30 seconds
+Max receive count: 3
 ```
 
 ### Step 3: Configure AWS Access
@@ -124,6 +128,67 @@ Identity type: IAM user
 ### Step 4: Create SQS Queues
 
 Create a main SQS queue and a dead-letter queue. Connect them with a redrive policy.
+
+The dead-letter queue is where SQS moves messages after they fail too many times. In this project, the main queue sends a message to the dead-letter queue after `SQS_MAX_RECEIVE_COUNT=3` failed receives.
+
+The setup script creates:
+
+- Main queue: `mini-sqs-task-queue`
+- Dead-letter queue: `mini-sqs-task-queue-dlq`
+- Main queue long polling: `20` seconds
+- Main queue visibility timeout: `30` seconds
+- Redrive policy: move messages to the DLQ after `3` failed receives
+
+Run the setup command:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.setup_queues
+```
+
+The script writes the generated queue URLs to your local `.env` file:
+
+```text
+SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/123456789012/mini-sqs-task-queue
+SQS_DLQ_URL=https://sqs.us-east-1.amazonaws.com/123456789012/mini-sqs-task-queue-dlq
+```
+
+Then verify local configuration again:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.check_setup
+```
+
+If you see an `AccessDenied` error, your AWS identity can authenticate but does not have permission to manage SQS queues yet. For a learning account, an AWS administrator can attach the AWS managed `AmazonSQSFullAccess` policy, or use a narrower custom policy for this tutorial.
+
+Example custom policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "sqs:ListQueues",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sqs:CreateQueue",
+        "sqs:GetQueueUrl",
+        "sqs:GetQueueAttributes",
+        "sqs:SetQueueAttributes",
+        "sqs:SendMessage",
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage"
+      ],
+      "Resource": "arn:aws:sqs:us-east-1:123456789012:mini-sqs-task-queue*"
+    }
+  ]
+}
+```
+
+Replace `us-east-1` and `123456789012` with your AWS region and account ID.
 
 ### Step 5: Build the Producer
 

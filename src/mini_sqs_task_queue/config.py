@@ -11,19 +11,27 @@ load_dotenv()
 @dataclass(frozen=True)
 class Settings:
     aws_region: str
+    queue_name: str
+    dlq_name: str
     queue_url: Optional[str]
     dlq_url: Optional[str]
     wait_time_seconds: int
     max_messages: int
+    visibility_timeout: int
+    max_receive_count: int
 
 
 def get_settings() -> Settings:
     return Settings(
         aws_region=os.getenv("AWS_REGION", "us-east-1"),
+        queue_name=os.getenv("SQS_QUEUE_NAME", "mini-sqs-task-queue"),
+        dlq_name=os.getenv("SQS_DLQ_NAME", "mini-sqs-task-queue-dlq"),
         queue_url=_optional_env("SQS_QUEUE_URL"),
         dlq_url=_optional_env("SQS_DLQ_URL"),
         wait_time_seconds=_int_env("SQS_WAIT_TIME_SECONDS", default=20),
         max_messages=_int_env("SQS_MAX_MESSAGES", default=10),
+        visibility_timeout=_int_env("SQS_VISIBILITY_TIMEOUT", default=30),
+        max_receive_count=_int_env("SQS_MAX_RECEIVE_COUNT", default=3),
     )
 
 
