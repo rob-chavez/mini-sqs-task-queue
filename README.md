@@ -218,6 +218,45 @@ Replace `us-east-1` and `123456789012` with your AWS region and account ID.
 
 Write a script that sends fake order messages to the main queue.
 
+The producer creates fake order events and sends them to the main SQS queue.
+
+Run the producer:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.producer
+```
+
+By default, it sends `5` messages. To send a different number:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.producer --count 3
+```
+
+Expected output should look similar to this:
+
+```text
+Sent order 8df6d9a1-4451-4c7c-9035-4db6e8f489d8 as message 33d5fd06-30e0-4ef6-ab6e-0216096eeff7
+Sent order f2406579-b58e-4eba-8261-5c2c89cefb7d as message c3196e29-53df-4c80-a401-cb6dbced6e42
+Sent order e0b4223d-6d3f-44e4-bbf7-9734eb67647f as message 59ca7d2a-b68f-4ddb-a14a-684f3a55f4b7
+```
+
+Each SQS message has two parts:
+
+- Message body: the JSON order payload that the worker will process
+- Message attributes: metadata about the message, such as `event_type=order.created` and `source=producer.py`
+
+To confirm messages are waiting in the queue:
+
+```bash
+source .env
+aws sqs get-queue-attributes \
+  --region us-east-1 \
+  --queue-url "$SQS_QUEUE_URL" \
+  --attribute-names ApproximateNumberOfMessages
+```
+
+You should see a non-zero `ApproximateNumberOfMessages` value after running the producer.
+
 ### Step 6: Build the Worker
 
 Write a script that receives messages, processes them, and deletes successful messages.
