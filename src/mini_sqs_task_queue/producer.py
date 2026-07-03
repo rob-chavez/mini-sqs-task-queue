@@ -35,27 +35,10 @@ def main() -> None:
     sqs = create_sqs_client()
 
     for _ in range(args.count):
-        order = _build_order()
-        response = sqs.send_message(
-            QueueUrl=settings.queue_url,
-            MessageBody=json.dumps(order),
-            MessageAttributes={
-                "event_type": {
-                    "DataType": "String",
-                    "StringValue": "order.created",
-                },
-                "source": {
-                    "DataType": "String",
-                    "StringValue": "producer.py",
-                },
-            },
-        )
+        _send_order(sqs, settings.queue_url, _build_order())
 
-        print(
-            "Sent order "
-            f"{order['order_id']} "
-            f"as message {response['MessageId']}"
-        )
+    if args.include_failing_order:
+        _send_order(sqs, settings.queue_url, _build_order(should_fail=True))
 
 
 def _parse_args() -> argparse.Namespace:
@@ -68,25 +51,72 @@ def _parse_args() -> argparse.Namespace:
         default=5,
         help="Number of fake orders to send.",
     )
+    parser.add_argument(
+        "--include-failing-order",
+        action="store_true",
+        help="Also send one order that the worker will fail on purpose.",
+    )
     args = parser.parse_args()
 
-    if args.count < 1:
-        parser.error("--count must be at least 1")
+    if args.count < 0:
+        parser.error("--count must be 0 or greater")
+
+    if args.count == 0 and not args.include_failing_order:
+        parser.error("--count must be at least 1 unless --include-failing-order is used")
 
     return args
 
 
-def _build_order() -> dict:
+def _send_order(sqs, queue_url: str, order: dict) -> None:
+    message_attributes = {
+        "event_type": {
+            "DataType": "String",
+            "StringValue": "order.created",
+        },
+        "source": {
+            "DataType": "String",
+            "StringValue": "producer.py",
+        },
+    }
+
+    if order.get("should_fail"):
+        message_attributes["failure_mode"] = {
+            "DataType": "String",
+            "StringValue": "always_fail",
+        }
+
+    response = sqs.send_message(
+        QueueUrl=queue_url,
+        MessageBody=json.dumps(order),
+        MessageAttributes=message_attributes,
+    )
+
+    failure_note = " (will fail)" if order.get("should_fail") else ""
+    print(
+        "Sent order "
+        f"{order['order_id']}{failure_note} "
+        f"as message {response['MessageId']}"
+    )
+
+
+def _build_order(should_fail: bool = False) -> dict:
     item_count = random.randint(1, 3)
     selected_items = random.sample(ITEMS, k=item_count)
 
-    return {
+    order = {
         "order_id": str(uuid4()),
         "customer": random.choice(CUSTOMERS),
         "items": selected_items,
         "total": _random_total(),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+
+    if should_fail:
+        order["customer"] = "Failure Demo"
+        order["should_fail"] = True
+        order["failure_reason"] = "This order is marked to fail for the retry lesson."
+
+    return order
 
 
 def _random_total() -> float:

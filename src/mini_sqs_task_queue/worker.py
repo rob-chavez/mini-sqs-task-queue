@@ -6,6 +6,10 @@ from mini_sqs_task_queue.config import get_settings
 from mini_sqs_task_queue.sqs_client import create_sqs_client
 
 
+class SimulatedProcessingError(Exception):
+    """Raised when a tutorial message is marked to fail on purpose."""
+
+
 def main() -> None:
     args = _parse_args()
     settings = get_settings()
@@ -37,14 +41,29 @@ def main() -> None:
         print("No messages available.")
         return
 
+    failed_messages = 0
+
     for message in messages:
-        order = _parse_message_body(message)
-        _process_order(order, message)
+        try:
+            order = _parse_message_body(message)
+            _process_order(order, message)
+        except SimulatedProcessingError as exc:
+            failed_messages += 1
+            print(f"Processing failed: {exc}")
+            print(
+                "Message was not deleted. SQS will make it visible again "
+                "after the visibility timeout."
+            )
+            continue
+
         sqs.delete_message(
             QueueUrl=settings.queue_url,
             ReceiptHandle=message["ReceiptHandle"],
         )
         print(f"Deleted message {message['MessageId']}")
+
+    if failed_messages:
+        raise SystemExit(1)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -102,6 +121,10 @@ def _process_order(order: Dict[str, Any], message: Dict[str, Any]) -> None:
     print(f"Customer: {order.get('customer')}")
     print(f"Items: {', '.join(order.get('items', []))}")
     print(f"Total: ${order.get('total')}")
+
+    if order.get("should_fail"):
+        reason = order.get("failure_reason", "Order was marked to fail.")
+        raise SimulatedProcessingError(str(reason))
 
 
 def _message_attribute(message: Dict[str, Any], name: str) -> str:

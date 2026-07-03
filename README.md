@@ -353,6 +353,64 @@ Long polling does not guarantee a message exists. It only gives SQS time to wait
 
 Make some messages fail on purpose so retries become visible.
 
+The producer can send one order that is marked to fail:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.producer --count 0 --include-failing-order
+```
+
+Expected output should look similar to this:
+
+```text
+Sent order 8df6d9a1-4451-4c7c-9035-4db6e8f489d8 (will fail) as message 33d5fd06-30e0-4ef6-ab6e-0216096eeff7
+```
+
+The worker checks for `should_fail=true` in the message body. When it sees that flag, it raises a simulated processing error and does not delete the message.
+
+Run the worker:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.worker --max-messages 1 --wait-time-seconds 0
+```
+
+Expected output should look similar to this:
+
+```text
+Polling for up to 1 message(s).
+Wait time: 0 second(s).
+Processing message 33d5fd06-30e0-4ef6-ab6e-0216096eeff7
+Receive count: 1
+Event type: order.created
+Order ID: 8df6d9a1-4451-4c7c-9035-4db6e8f489d8
+Customer: Failure Demo
+Items: keyboard
+Total: $42.18
+Processing failed: This order is marked to fail for the retry lesson.
+Message was not deleted. SQS will make it visible again after the visibility timeout.
+```
+
+The worker exits with a non-zero status when processing fails. That is expected in this step.
+
+Because the message was not deleted, SQS hides it temporarily. Check the queue right away:
+
+```bash
+source .env
+aws sqs get-queue-attributes \
+  --region "$AWS_REGION" \
+  --queue-url "$SQS_QUEUE_URL" \
+  --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible
+```
+
+You should see the message counted as in-flight, which means it has been received but is not currently visible to other workers.
+
+After the visibility timeout passes, run the worker again. In this tutorial, the visibility timeout is `30` seconds:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.worker --max-messages 1 --wait-time-seconds 0
+```
+
+The `Receive count` should increase. That is SQS retry behavior: a failed message becomes visible again if the worker does not delete it.
+
 ### Step 9: Explore the Dead-Letter Queue
 
 Inspect messages that failed too many times and landed in the dead-letter queue.
