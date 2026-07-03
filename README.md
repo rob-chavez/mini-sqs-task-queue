@@ -33,6 +33,40 @@ Create the Git repository, add a `.gitignore`, and document the learning path.
 
 Add the basic project layout, dependency files, and an `.env.example` file.
 
+Files added in this step:
+
+- `.env.example`: documents local environment variables without storing secrets
+- `requirements.txt`: lists Python dependencies
+- `src/mini_sqs_task_queue/config.py`: loads settings from environment variables
+- `src/mini_sqs_task_queue/sqs_client.py`: creates a reusable SQS client
+- `src/mini_sqs_task_queue/check_setup.py`: verifies local configuration
+
+To set up your local Python environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+To verify the project can load local configuration:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.check_setup
+```
+
+Expected output should look similar to this before queues exist:
+
+```text
+Mini SQS Task Queue setup check
+AWS region: us-east-1
+Main queue URL: not set yet
+Dead-letter queue URL: not set yet
+Worker wait time: 20 seconds
+Worker max messages: 10
+```
+
 ### Step 3: Configure AWS Access
 
 Install and configure the AWS CLI, choose a region, and verify credentials.
@@ -67,7 +101,7 @@ Add setup instructions, diagrams, cleanup steps, and troubleshooting notes for G
 
 ## Prerequisites
 
-- Python 3.10 or newer
+- Python 3.9 or newer
 - An AWS account
 - AWS CLI installed
 - Basic terminal familiarity
