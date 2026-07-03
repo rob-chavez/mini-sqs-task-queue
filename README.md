@@ -10,6 +10,38 @@ The project simulates a tiny order-processing system:
 - Failed messages are retried automatically by SQS.
 - Repeatedly failing messages eventually move to a dead-letter queue.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    Producer["Producer\nproducer.py"] --> MainQueue["Main SQS Queue\nmini-sqs-task-queue"]
+    MainQueue --> Worker["Worker\nworker.py"]
+    Worker -->|"delete on success"| Done["Processed"]
+    Worker -->|"no delete on failure"| MainQueue
+    MainQueue -->|"after max receives"| DLQ["Dead-Letter Queue\nmini-sqs-task-queue-dlq"]
+    DLQ --> Inspector["DLQ Inspector\ninspect_dlq.py"]
+```
+
+## Repository Layout
+
+```text
+.
+|-- .env.example
+|-- README.md
+|-- requirements.txt
+`-- src/mini_sqs_task_queue/
+    |-- check_aws_access.py
+    |-- check_setup.py
+    |-- cleanup_queues.py
+    |-- config.py
+    |-- inspect_dlq.py
+    |-- producer.py
+    |-- setup_queues.py
+    |-- smoke_test_sqs.py
+    |-- sqs_client.py
+    `-- worker.py
+```
+
 ## Learning Goals
 
 By the end of this project, you should understand:
@@ -475,6 +507,128 @@ PYTHONPATH=src python -m mini_sqs_task_queue.inspect_dlq --delete-after-read
 ### Step 10: Polish the Tutorial
 
 Add setup instructions, diagrams, cleanup steps, and troubleshooting notes for GitHub readers.
+
+At this point, the project has a complete beginner tutorial:
+
+- A diagram showing how messages move through the system
+- A safe `.env.example` file
+- Scripts for setup, smoke testing, producing, consuming, failing, DLQ inspection, and cleanup
+- README steps that explain the SQS concept being demonstrated at each stage
+
+## Command Summary
+
+Set up local Python dependencies:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Verify local config and AWS access:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.check_setup
+PYTHONPATH=src python -m mini_sqs_task_queue.check_aws_access
+```
+
+Create or update the queues:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.setup_queues
+```
+
+Run the smoke test:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.smoke_test_sqs
+```
+
+Send and process successful orders:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.producer --count 3
+PYTHONPATH=src python -m mini_sqs_task_queue.worker
+```
+
+Send a failing order:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.producer --count 0 --include-failing-order
+PYTHONPATH=src python -m mini_sqs_task_queue.worker --max-messages 1 --wait-time-seconds 0
+```
+
+Inspect the dead-letter queue:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.inspect_dlq
+```
+
+## Cleanup
+
+SQS is inexpensive for this tutorial, but it is still good practice to clean up AWS resources when you are done.
+
+Preview the cleanup plan:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.cleanup_queues
+```
+
+Delete the main queue and dead-letter queue:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.cleanup_queues --confirm-delete
+```
+
+The cleanup script also clears `SQS_QUEUE_URL` and `SQS_DLQ_URL` in your local `.env` file after deleting the queues. If you want to recreate the queues later, run:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.setup_queues
+```
+
+To delete only DLQ messages after inspecting them:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.inspect_dlq --delete-after-read
+```
+
+## Troubleshooting
+
+`AccessDenied` when creating queues:
+
+Your AWS identity can authenticate, but it does not have SQS permissions. For a learning account, attach `AmazonSQSFullAccess` or use the narrower custom policy shown in Step 4.
+
+Queue URL is not set:
+
+Run `PYTHONPATH=src python -m mini_sqs_task_queue.setup_queues`. The setup script writes `SQS_QUEUE_URL` and `SQS_DLQ_URL` into your ignored local `.env` file.
+
+Messages seem to disappear after receiving:
+
+They are probably in-flight, not deleted. SQS hides received messages for the visibility timeout. If the worker does not delete them, they become visible again later.
+
+Queue counts look wrong for a few seconds:
+
+`ApproximateNumberOfMessages` and `ApproximateNumberOfMessagesNotVisible` are approximate. Wait a few seconds and check again.
+
+DLQ inspection makes the DLQ look empty:
+
+Reading from the DLQ temporarily hides the message. It becomes visible again after the visibility timeout unless you delete it.
+
+## Publishing to GitHub
+
+Create a new empty GitHub repository, then connect this local repo to it:
+
+```bash
+git remote add origin https://github.com/YOUR_USERNAME/mini-sqs-task-queue.git
+git push -u origin main
+```
+
+Before pushing, double-check that `.env` is ignored:
+
+```bash
+git check-ignore -v .env
+```
 
 ## Prerequisites
 
