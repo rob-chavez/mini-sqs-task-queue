@@ -158,6 +158,30 @@ Then verify local configuration again:
 PYTHONPATH=src python -m mini_sqs_task_queue.check_setup
 ```
 
+Finally, run a quick SQS smoke test:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.smoke_test_sqs
+```
+
+This smoke test verifies the complete basic message lifecycle:
+
+- Send one JSON test message to the main queue
+- Receive the same message from SQS
+- Delete the message after receiving it
+- Check that the queue has no visible or in-flight messages left
+
+Expected output should look similar to this:
+
+```text
+Sent message: ca71f51d-9671-4ca5-aa45-c74a2d32e40c
+Received message: ca71f51d-9671-4ca5-aa45-c74a2d32e40c
+Message body: {"order_id": "smoke-test-...", "customer": "Tutorial Smoke Test", "total": 12.34}
+Deleted message successfully
+Approximate visible messages: 0
+Approximate in-flight messages: 0
+```
+
 If you see an `AccessDenied` error, your AWS identity can authenticate but does not have permission to manage SQS queues yet. For a learning account, an AWS administrator can attach the AWS managed `AmazonSQSFullAccess` policy, or use a narrower custom policy for this tutorial.
 
 Example custom policy:
