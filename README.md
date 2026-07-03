@@ -342,6 +342,20 @@ aws sqs get-queue-attributes \
 
 SQS queue counts are approximate. After sending, receiving, or deleting messages, `ApproximateNumberOfMessages` and `ApproximateNumberOfMessagesNotVisible` can take a few seconds to settle.
 
+The same worker module can also run as an AWS Lambda SQS handler:
+
+```text
+mini_sqs_task_queue.worker.lambda_handler
+```
+
+When SQS invokes Lambda, your code does not call `delete_message`. Lambda deletes successful messages automatically after the handler finishes. Failed messages are returned in `batchItemFailures`, which lets SQS retry only those records.
+
+When configuring the Lambda event source mapping, enable partial batch responses:
+
+```text
+ReportBatchItemFailures
+```
+
 ### Step 7: Add Long Polling
 
 Update the worker to wait for messages efficiently instead of constantly returning empty responses.
@@ -564,6 +578,30 @@ Inspect the dead-letter queue:
 ```bash
 PYTHONPATH=src python -m mini_sqs_task_queue.inspect_dlq
 ```
+
+Use the worker as a Lambda handler:
+
+```text
+Handler: mini_sqs_task_queue.worker.lambda_handler
+Event source: mini-sqs-task-queue
+Partial batch response: ReportBatchItemFailures
+```
+
+## Lambda Worker Notes
+
+The local worker and Lambda worker use the same order-processing code, but SQS message ownership is different:
+
+- Local worker: receives messages with `boto3`, processes them, then calls `delete_message` on success
+- Lambda worker: receives SQS records from Lambda, processes them, and returns failed message IDs in `batchItemFailures`
+
+For the Lambda event source mapping, use:
+
+- Source queue: `mini-sqs-task-queue`
+- Batch size: start with `10`
+- Function response type: `ReportBatchItemFailures`
+- Execution role permissions: allow CloudWatch Logs and SQS receive/delete/read attributes on the main queue
+
+The Lambda handler still uses the queue redrive policy from Step 4. A message that keeps failing will eventually move to `mini-sqs-task-queue-dlq`.
 
 ## Cleanup
 
