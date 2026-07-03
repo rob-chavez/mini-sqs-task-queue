@@ -415,6 +415,63 @@ The `Receive count` should increase. That is SQS retry behavior: a failed messag
 
 Inspect messages that failed too many times and landed in the dead-letter queue.
 
+The main queue is configured with `SQS_MAX_RECEIVE_COUNT=3`. After the failing message is received and fails enough times, SQS moves it to the dead-letter queue instead of returning it to the main queue forever.
+
+To push the failing message toward the DLQ, run the worker, wait for the visibility timeout, and run it again:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.worker --max-messages 1 --wait-time-seconds 0
+```
+
+Repeat that until the message stops appearing in the main queue. In this tutorial, the visibility timeout is `30` seconds, so wait at least `30` seconds between failed receives.
+
+With `SQS_MAX_RECEIVE_COUNT=3`, you may see the worker process the message with `Receive count: 3`. After that, the next receive attempt can move the message to the DLQ without returning it to the worker.
+
+Check the main queue and DLQ counts:
+
+```bash
+source .env
+aws sqs get-queue-attributes \
+  --region "$AWS_REGION" \
+  --queue-url "$SQS_QUEUE_URL" \
+  --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible
+
+aws sqs get-queue-attributes \
+  --region "$AWS_REGION" \
+  --queue-url "$SQS_DLQ_URL" \
+  --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible
+```
+
+Inspect the DLQ message:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.inspect_dlq
+```
+
+Expected output should look similar to this:
+
+```text
+Checking DLQ for up to 1 message(s).
+DLQ message: 33d5fd06-30e0-4ef6-ab6e-0216096eeff7
+DLQ receive count: 4
+Original event type: order.created
+Failure mode: always_fail
+Order ID: 8df6d9a1-4451-4c7c-9035-4db6e8f489d8
+Customer: Failure Demo
+Items: keyboard
+Total: $42.18
+Failure reason: This order is marked to fail for the retry lesson.
+DLQ message was not deleted. It will become visible again after the visibility timeout.
+```
+
+Reading from SQS is not a true peek. If you inspect a DLQ message without deleting it, SQS hides it for the visibility timeout and then makes it visible again.
+
+To clean up a DLQ message after reading it:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.inspect_dlq --delete-after-read
+```
+
 ### Step 10: Polish the Tutorial
 
 Add setup instructions, diagrams, cleanup steps, and troubleshooting notes for GitHub readers.
