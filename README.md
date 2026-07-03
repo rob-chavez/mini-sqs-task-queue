@@ -71,6 +71,56 @@ Worker max messages: 10
 
 Install and configure the AWS CLI, choose a region, and verify credentials.
 
+This project uses your normal AWS credential chain. Do not put AWS access keys in `.env` and do not commit credentials to Git.
+
+First, confirm the AWS CLI is installed:
+
+```bash
+aws --version
+```
+
+If you have not configured AWS credentials yet, run:
+
+```bash
+aws configure
+```
+
+The AWS CLI will ask for:
+
+- AWS access key ID
+- AWS secret access key
+- Default region name
+- Default output format
+
+For this tutorial, choose one region and use it consistently. For example, if your AWS CLI is configured for `us-east-1`, make sure `AWS_REGION=us-east-1` in your local `.env` file too.
+
+To see your configured CLI region:
+
+```bash
+aws configure get region
+```
+
+To verify your AWS credentials with the CLI:
+
+```bash
+aws sts get-caller-identity
+```
+
+To verify your AWS credentials with this Python project:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.check_aws_access
+```
+
+Expected output should look similar to this:
+
+```text
+AWS access check passed
+Region: us-east-1
+Account: ********1234
+Identity type: IAM user
+```
+
 ### Step 4: Create SQS Queues
 
 Create a main SQS queue and a dead-letter queue. Connect them with a redrive policy.
