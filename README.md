@@ -261,6 +261,49 @@ You should see a non-zero `ApproximateNumberOfMessages` value after running the 
 
 Write a script that receives messages, processes them, and deletes successful messages.
 
+The worker receives order messages from the queue, prints the order details, and deletes each message after it is processed.
+
+Run the worker:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.worker
+```
+
+By default, the worker receives one message. To receive up to three messages in one request:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.worker --max-messages 3
+```
+
+In this step, the worker uses short polling with `--wait-time-seconds 0`. With short polling, SQS can return fewer messages than requested, even when more messages are waiting in the queue. If that happens, run the worker again.
+
+Expected output should look similar to this:
+
+```text
+Processing message 33d5fd06-30e0-4ef6-ab6e-0216096eeff7
+Receive count: 1
+Event type: order.created
+Order ID: 8df6d9a1-4451-4c7c-9035-4db6e8f489d8
+Customer: Grace Hopper
+Items: keyboard, coffee mug
+Total: $42.18
+Deleted message 33d5fd06-30e0-4ef6-ab6e-0216096eeff7
+```
+
+The delete step matters. When a worker receives an SQS message, SQS only hides it for the visibility timeout. If the worker does not delete the message before that timeout ends, SQS makes the message visible again and another worker can receive it.
+
+To confirm the worker removed messages from the queue:
+
+```bash
+source .env
+aws sqs get-queue-attributes \
+  --region "$AWS_REGION" \
+  --queue-url "$SQS_QUEUE_URL" \
+  --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible
+```
+
+SQS queue counts are approximate. After sending, receiving, or deleting messages, `ApproximateNumberOfMessages` and `ApproximateNumberOfMessagesNotVisible` can take a few seconds to settle.
+
 ### Step 7: Add Long Polling
 
 Update the worker to wait for messages efficiently instead of constantly returning empty responses.
