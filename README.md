@@ -603,6 +603,34 @@ For the Lambda event source mapping, use:
 
 The Lambda handler still uses the queue redrive policy from Step 4. A message that keeps failing will eventually move to `mini-sqs-task-queue-dlq`.
 
+Build a Lambda deployment package:
+
+```bash
+scripts/package_lambda.sh
+```
+
+This creates:
+
+```text
+dist/mini-sqs-task-queue-lambda.zip
+```
+
+Use this Lambda handler value:
+
+```text
+mini_sqs_task_queue.worker.lambda_handler
+```
+
+Next deployment steps:
+
+1. Create a Lambda function with a supported Python runtime.
+2. Upload `dist/mini-sqs-task-queue-lambda.zip`.
+3. Set the handler to `mini_sqs_task_queue.worker.lambda_handler`.
+4. Add an SQS trigger for `mini-sqs-task-queue`.
+5. Enable partial batch responses with `ReportBatchItemFailures`.
+6. Give the Lambda execution role CloudWatch Logs permissions and SQS receive/delete/read permissions for the main queue.
+7. Send a test message with `producer.py` and watch the Lambda logs in CloudWatch.
+
 ## Cleanup
 
 SQS is inexpensive for this tutorial, but it is still good practice to clean up AWS resources when you are done.
