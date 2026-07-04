@@ -42,6 +42,35 @@ flowchart LR
     `-- worker.py
 ```
 
+## Fresh Clone Quick Start
+
+Clone the repository, create a local virtual environment, and copy the safe environment template:
+
+```bash
+git clone https://github.com/YOUR_USERNAME/mini-sqs-task-queue.git
+cd mini-sqs-task-queue
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Configure AWS credentials outside this repository:
+
+```bash
+aws configure
+```
+
+Then run the tutorial setup and smoke test:
+
+```bash
+PYTHONPATH=src python -m mini_sqs_task_queue.check_aws_access
+PYTHONPATH=src python -m mini_sqs_task_queue.setup_queues
+PYTHONPATH=src python -m mini_sqs_task_queue.smoke_test_sqs
+```
+
+After that, follow the numbered roadmap below.
+
 ## Learning Goals
 
 By the end of this project, you should understand:
@@ -695,6 +724,15 @@ Before pushing, double-check that `.env` is ignored:
 ```bash
 git check-ignore -v .env
 ```
+
+Recommended pre-push check:
+
+```bash
+git status --short
+git check-ignore -v .env build dist
+```
+
+Only source files, docs, scripts, `.env.example`, and dependency metadata should be committed. Do not commit `.env`, `.venv`, `build/`, `dist/`, or generated zip files.
 
 ## Prerequisites
 
