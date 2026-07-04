@@ -47,7 +47,7 @@ flowchart LR
 Clone the repository, create a local virtual environment, and copy the safe environment template:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/mini-sqs-task-queue.git
+git clone https://github.com/rob-chavez/mini-sqs-task-queue.git
 cd mini-sqs-task-queue
 python3 -m venv .venv
 source .venv/bin/activate
